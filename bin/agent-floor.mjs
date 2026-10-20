@@ -192,7 +192,34 @@ async function hook(kind) {
       const { fromCursor, cursorResponse } = await import('../adapters/cursor.mjs');
       const input = parseJson(await readStdin());
       response = cursorResponse(input?.hook_event_name);
-      await postOrLaunch(fromCursor(input));
+      if (response) process.stdout.write(response);
+      const events = fromCursor(input);
+      await postOrLaunch(events);
+
+      if (input?.hook_event_name === 'preCompact' && events.length) {
+        const ev = events[0];
+        setTimeout(async () => {
+          try {
+            const res = await fetch(`${URL_BASE}/state`);
+            if (res.ok) {
+              const state = await res.json();
+              const a = state.agents?.[ev.agent];
+              if (a && a.status === 'thinking' && a.activity === 'Tidying up memory') {
+                await postOrLaunch([{
+                  type: 'status',
+                  agent: ev.agent,
+                  team: ev.team,
+                  source: ev.source,
+                  status: 'idle',
+                  activity: 'Waiting for you',
+                }]);
+              }
+            }
+          } catch {}
+          process.exit(0);
+        }, 10000);
+        return;
+      }
     }
   } catch {
     // Floor not running, or bad payload. Stay silent.
@@ -251,7 +278,7 @@ function claudeHooks() {
 
 function cursorHooks() {
   const command = hookCmd('cursor');
-  const names = ['beforeSubmitPrompt', 'afterAgentThought', 'afterAgentResponse', 'afterFileEdit', 'afterShellExecution', 'afterMCPExecution', 'stop'];
+  const names = ['beforeSubmitPrompt', 'afterAgentThought', 'afterAgentResponse', 'afterFileEdit', 'afterShellExecution', 'afterMCPExecution', 'preCompact', 'stop'];
   return { version: 1, hooks: Object.fromEntries(names.map((n) => [n, [{ command }]])) };
 }
 

@@ -57,6 +57,7 @@ If your Codex build supports Claude-style hooks with `hook_event_name` payloads 
     "afterMCPExecution": [{ "command": "agent-floor hook cursor" }],
     "afterAgentResponse": [{ "command": "agent-floor hook cursor" }],
     "afterAgentThought": [{ "command": "agent-floor hook cursor" }],
+    "preCompact": [{ "command": "agent-floor hook cursor" }],
     "stop": [{ "command": "agent-floor hook cursor" }]
   }
 }

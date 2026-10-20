@@ -71,6 +71,9 @@ test('codex notify payload', () => {
 test('cursor adapter only answers beforeSubmitPrompt', () => {
   const evs = fromCursor({ hook_event_name: 'afterFileEdit', conversation_id: 'c1', workspace_roots: ['/w/site'], file_path: '/w/site/a.md' });
   assert.equal(evs[0].activity, 'Edited a.md');
+  const compact = fromCursor({ hook_event_name: 'preCompact', conversation_id: 'c1', workspace_roots: ['/w/site'] });
+  assert.equal(compact[0].activity, 'Tidying up memory');
+  assert.equal(compact[0].status, 'thinking');
   assert.equal(cursorResponse('afterFileEdit'), '');
   assert.deepEqual(JSON.parse(cursorResponse('beforeSubmitPrompt')), { continue: true });
 });

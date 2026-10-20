@@ -1,6 +1,6 @@
 // Cursor agent hooks -> Agent Floor events.
 // Cursor writes a JSON payload to the hook's stdin. We only subscribe to hooks
-// that observe (after*, stop, beforeSubmitPrompt) so Agent Floor can never change
+// that observe (after*, stop, preCompact, beforeSubmitPrompt) so Agent Floor can never change
 // a permission decision. See docs/integrations.md for the hooks.json snippet.
 import { basename } from 'node:path';
 import { shortId, teamFromCwd } from './common.mjs';
@@ -34,6 +34,8 @@ export function fromCursor(input) {
       return [{ type: 'tool', ...base, tool: 'MCP', activity: `MCP: ${input.tool_name ?? 'tool'}` }];
     case 'afterAgentResponse':
       return [{ type: 'status', ...base, status: 'thinking', activity: `Replied: ${input.text ?? ''}` }];
+    case 'preCompact':
+      return [{ type: 'status', ...base, status: 'thinking', activity: 'Tidying up memory' }];
     case 'stop':
       return [
         {
