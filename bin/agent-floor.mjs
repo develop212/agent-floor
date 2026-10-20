@@ -251,7 +251,18 @@ function claudeHooks() {
 
 function cursorHooks() {
   const command = hookCmd('cursor');
-  const names = ['beforeSubmitPrompt', 'afterAgentThought', 'afterAgentResponse', 'afterFileEdit', 'afterShellExecution', 'afterMCPExecution', 'stop'];
+  const names = [
+    'beforeSubmitPrompt',
+    'afterAgentThought',
+    'afterAgentResponse',
+    'afterFileEdit',
+    'afterShellExecution',
+    'afterMCPExecution',
+    'subagentStart',
+    'subagentStop',
+    'stop',
+    'sessionEnd',
+  ];
   return { version: 1, hooks: Object.fromEntries(names.map((n) => [n, [{ command }]])) };
 }
 

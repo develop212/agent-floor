@@ -57,12 +57,15 @@ If your Codex build supports Claude-style hooks with `hook_event_name` payloads 
     "afterMCPExecution": [{ "command": "agent-floor hook cursor" }],
     "afterAgentResponse": [{ "command": "agent-floor hook cursor" }],
     "afterAgentThought": [{ "command": "agent-floor hook cursor" }],
-    "stop": [{ "command": "agent-floor hook cursor" }]
+    "subagentStart": [{ "command": "agent-floor hook cursor" }],
+    "subagentStop": [{ "command": "agent-floor hook cursor" }],
+    "stop": [{ "command": "agent-floor hook cursor" }],
+    "sessionEnd": [{ "command": "agent-floor hook cursor" }]
   }
 }
 ```
 
-Hooks that gate permissions (`beforeShellExecution`, `beforeMCPExecution`, `beforeReadFile`) are deliberately left out. Hook names have changed between Cursor releases, so if one is not recognised by your version, Cursor ignores it.
+Hooks that gate permissions (`beforeShellExecution`, `beforeMCPExecution`, `beforeReadFile`) are deliberately left out; `subagentStart` is allowed through so spawned helpers join the floor. Hook names have changed between Cursor releases, so if one is not recognised by your version, Cursor ignores it.
 
 ## Your own agents
 

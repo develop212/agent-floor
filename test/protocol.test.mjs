@@ -68,11 +68,46 @@ test('codex notify payload', () => {
   assert.equal(evs[0].team, 'api');
 });
 
-test('cursor adapter only answers beforeSubmitPrompt', () => {
+test('cursor adapter only answers beforeSubmitPrompt and subagentStart', () => {
   const evs = fromCursor({ hook_event_name: 'afterFileEdit', conversation_id: 'c1', workspace_roots: ['/w/site'], file_path: '/w/site/a.md' });
   assert.equal(evs[0].activity, 'Edited a.md');
   assert.equal(cursorResponse('afterFileEdit'), '');
   assert.deepEqual(JSON.parse(cursorResponse('beforeSubmitPrompt')), { continue: true });
+  assert.deepEqual(JSON.parse(cursorResponse('subagentStart')), { permission: 'allow' });
+});
+
+test('cursor adapter maps subagents and sessionEnd', () => {
+  const base = { conversation_id: 'conv123', workspace_roots: ['/home/me/app'] };
+  const start = fromCursor({
+    ...base,
+    hook_event_name: 'subagentStart',
+    subagent_id: 'sub_1',
+    subagent_type: 'explore',
+    task: 'Investigate auth flow',
+  });
+  assert.equal(start.length, 2);
+  assert.equal(start[0].type, 'message');
+  assert.equal(start[0].to, 'cursor:conv123:sub1');
+  assert.equal(start[1].type, 'join');
+  assert.equal(start[1].parent, 'cursor:conv123');
+  assert.equal(start[1].role, 'explore');
+
+  const stop = fromCursor({
+    ...base,
+    hook_event_name: 'subagentStop',
+    subagent_id: 'sub_1',
+    subagent_type: 'explore',
+    status: 'completed',
+    summary: 'Auth verified',
+  });
+  assert.equal(stop.length, 3);
+  assert.equal(stop[0].type, 'message');
+  assert.equal(stop[0].to, 'cursor:conv123');
+  assert.equal(stop[1].status, 'done');
+  assert.equal(stop[2].status, 'thinking');
+
+  const end = fromCursor({ ...base, hook_event_name: 'sessionEnd' });
+  assert.equal(end[0].type, 'leave');
 });
 
 test('sweep removes departed agents and empty teams', () => {
