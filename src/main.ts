@@ -1,7 +1,7 @@
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
 import './styles.css';
-import { connect, isDemoRunning, startDemo } from './core/connection';
+import { connect, isDemoRunning, serverBase, startDemo } from './core/connection';
 import { store } from './core/store';
 import { Hud } from './ui/hud';
 import { World } from './world/World';
@@ -62,6 +62,7 @@ async function boot() {
     startDemo: () => {
       if (!isDemoRunning()) startDemo();
     },
+    submitChat,
   });
 
   function applyTheme(next: ThemeName, persist = false) {
@@ -112,6 +113,46 @@ async function boot() {
       box.textContent = `${p.fps.toFixed(0)} fps  cpu ${p.frameMs.toFixed(1)} ms\n${p.calls} draws  ${(p.triangles / 1000).toFixed(0)}k tris\n${p.agents} agents  sync ${p.syncMs.toFixed(1)} ms (worst ${p.worstSyncMs.toFixed(0)})`;
     }, 500);
   }
+}
+
+// Web chat: POST a prompt, hand each streamed chunk back as it arrives.
+async function submitChat(prompt: string, onDelta: (chunk: string) => void): Promise<void> {
+  const res = await fetch(`${serverBase()}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  });
+  if (!res.ok || !res.body) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let error = '';
+  const readFrame = (frame: string) => {
+    let event = '';
+    let data = '';
+    for (const line of frame.split('\n')) {
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) data = line.slice(5).trimStart();
+    }
+    if (!data) return;
+    if (event === 'delta') {
+      try { onDelta(JSON.parse(data) as string); } catch { /* skip malformed */ }
+    } else if (event === 'error') {
+      try { error = JSON.parse(data) as string; } catch { /* skip malformed */ }
+    }
+  };
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split('\n\n');
+    buffer = frames.pop() || '';
+    for (const frame of frames) readFrame(frame);
+  }
+  if (error) throw new Error(error);
 }
 
 boot();

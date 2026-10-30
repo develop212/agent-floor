@@ -2,6 +2,7 @@
 //
 //   POST /events        one event or an array of events (see docs/protocol.md)
 //   GET  /stream        Server-Sent Events: a `snapshot`, then `event` + `effects`
+//   POST /chat          spawn a chat session, stream reply via SSE
 //   GET  /state         current world as JSON
 //   POST /reset         clear the floor
 //   GET  /*             the built web app (dist/)
@@ -10,6 +11,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyEvent, createState, normalizeEvent, sweep, PROTOCOL_VERSION } from '../shared/protocol.js';
+import { streamChat, resolveConfig } from './chat.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const MAX_BODY = 256 * 1024;
@@ -107,6 +109,54 @@ export function startServer({
 
   const loopback = host === '127.0.0.1' || host === 'localhost' || host === '::1';
 
+  // POST /chat { prompt } -> SSE stream: `delta` frames, then `done` or `error`.
+  // Runs on the same trust level as POST /events: loopback only, no auth.
+  async function handleChat(req, res) {
+    let body;
+    try { body = await readBody(req); }
+    catch (err) { return json(res, 400, { error: err.message }); }
+
+    const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
+    if (!prompt) return json(res, 400, { error: 'prompt is required' });
+    if (prompt.length > 8000) return json(res, 400, { error: 'prompt too long' });
+
+    const agentId = `chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const model = typeof body?.model === 'string' ? body.model : resolveConfig().model;
+
+    // The agent takes a desk while it works, then walks out.
+    ingest({ type: 'join', agent: agentId, name: 'Web Chat', role: 'Agent', team: 'web-chat', source: 'agent-floor', ts: Date.now() });
+    ingest({ type: 'status', agent: agentId, status: 'thinking', activity: 'Thinking...', ts: Date.now() });
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
+    let closed = false;
+    req.on('close', () => { closed = true; });
+
+    let text = '';
+    try {
+      for await (const chunk of streamChat({ prompt, model })) {
+        if (closed) return;
+        text += chunk;
+        res.write(`event: delta\ndata: ${JSON.stringify(chunk)}\n\n`);
+      }
+      if (!closed) res.write(`event: done\ndata: ${JSON.stringify(text || '(no response)')}\n\n`);
+      ingest({ type: 'status', agent: agentId, status: 'done', activity: 'Finished', ts: Date.now() });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!closed) res.write(`event: error\ndata: ${JSON.stringify(msg)}\n\n`);
+      ingest({ type: 'status', agent: agentId, status: 'error', activity: msg.slice(0, 280), ts: Date.now() });
+    } finally {
+      // The desk stays a little while after the reply, then the agent walks out.
+      setTimeout(() => ingest({ type: 'leave', agent: agentId }), 10000);
+      res.end();
+    }
+  }
+
   const server = createServer(async (req, res) => {
     // DNS-rebinding guard: when bound to loopback, only answer loopback hostnames.
     if (loopback && !/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(req.headers.host || '')) {
@@ -143,6 +193,10 @@ export function startServer({
       }
       if (pathname === '/state' && req.method === 'GET') return json(res, 200, state);
       if (pathname === '/health') return json(res, 200, { ok: true, version: PROTOCOL_VERSION, agents: Object.keys(state.agents).length });
+      if (pathname === '/chat' && req.method === 'POST') {
+        await handleChat(req, res);
+        return;
+      }
       if (pathname === '/reset' && req.method === 'POST') {
         ingest({ type: 'reset' });
         return json(res, 200, { ok: true });

@@ -157,6 +157,7 @@ button {
 .topbar,
 .demo-note,
 .teams,
+.busy,
 .card,
 .empty,
 .hint {
@@ -427,6 +428,151 @@ button {
   border-radius: 50%;
   background: #f5a524;
   box-shadow: 0 0 0 2px var(--glass-strong);
+}
+
+/* ---------------------------------------------------------------- who is working */
+
+.tools .icon-btn {
+  position: relative;
+}
+
+.busy-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: 700 9.5px/1 'Geist Mono Variable', ui-monospace, monospace;
+  pointer-events: none;
+}
+
+.tools .icon-btn.active {
+  background: var(--fill-2);
+}
+
+.busy {
+  position: absolute;
+  left: 16px;
+  top: calc(max(16px, env(safe-area-inset-top)) + 58px);
+  width: 340px;
+  max-height: min(60dvh, 480px);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px 8px;
+  border-radius: var(--radius-panel);
+  opacity: 0;
+  transform: translateX(-24px) scale(0.98);
+  transform-origin: 0% 0%;
+  visibility: hidden;
+  transition: opacity 220ms ease, transform 420ms var(--ease-out), visibility 0s linear 420ms;
+}
+
+.busy.show {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition: opacity 220ms ease, transform 420ms var(--ease-out), visibility 0s;
+}
+
+.busy-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 6px;
+}
+
+.busy-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.busy-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+}
+
+.busy-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.busy-row:hover {
+  background: var(--fill);
+}
+
+.busy-row.selected {
+  background: var(--fill-2);
+}
+
+.busy-row .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.busy-who {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.busy-who b {
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.busy-meta {
+  color: var(--text-2);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.busy-when {
+  flex: none;
+  color: var(--text-3);
+  font: 500 11px/1 'Geist Mono Variable', ui-monospace, monospace;
+}
+
+.busy-none {
+  margin: 0;
+  padding: 4px 8px 8px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .busy {
+    right: 16px;
+    width: auto;
+  }
 }
 
 /* ---------------------------------------------------------------- hint */
@@ -1122,4 +1268,153 @@ button {
 
 .in-app-mac .demo-note {
   top: 64px;
+}
+
+/* ---------------------------------------------------------------- chat panel */
+
+.chat {
+  position: absolute;
+  right: 16px;
+  top: calc(max(16px, env(safe-area-inset-top)) + 58px);
+  width: 340px;
+  max-height: min(60dvh, 520px);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px 8px;
+  border-radius: var(--radius-panel);
+  opacity: 0;
+  transform: translateX(24px) scale(0.98);
+  transform-origin: 100% 0%;
+  visibility: hidden;
+  transition: opacity 220ms ease, transform 420ms var(--ease-out), visibility 0s linear 420ms;
+}
+
+.chat.show {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition: opacity 220ms ease, transform 420ms var(--ease-out), visibility 0s;
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 6px;
+}
+
+.chat-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.chat-close {
+  padding: 2px 4px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 2px;
+  min-height: 0;
+}
+
+.chat-msg {
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-msg.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.chat-msg.assistant {
+  align-self: flex-start;
+  background: var(--fill-2);
+  color: var(--text);
+}
+
+.chat-msg.assistant.stream::after {
+  content: '▋';
+  animation: blink 1s step-end infinite;
+  display: inline;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  padding-top: 6px;
+  border-top: 1px solid var(--glass-edge);
+  margin-top: 6px;
+}
+
+.chat-input {
+  flex: 1;
+  resize: none;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--fill);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  min-height: 38px;
+  max-height: 120px;
+}
+
+.chat-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.chat-input::placeholder {
+  color: var(--muted);
+}
+
+.chat-send {
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.chat-send:disabled {
+  opacity: 0.4;
+}
+
+.chat-status {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 4px 2px 0;
+  min-height: 14px;
+}
+
+.chat-status.error {
+  color: var(--accent, #f66);
+}
+
+@media (max-width: 640px) {
+  .chat {
+    right: 8px;
+    left: 8px;
+    width: auto;
+    top: calc(max(16px, env(safe-area-inset-top)) + 52px);
+  }
 }

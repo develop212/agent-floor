@@ -6,7 +6,7 @@ import { DEMO_ONLY } from '../config';
 const params = new URLSearchParams(location.search);
 
 /** Where the floor server lives. Same origin by default; `?server=` overrides. */
-function serverBase() {
+export function serverBase() {
   const explicit = params.get('server');
   if (explicit) return explicit.replace(/\/$/, '');
   return '';

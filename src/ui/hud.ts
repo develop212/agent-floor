@@ -3,16 +3,17 @@ import type { ConnectionMode } from '../core/store';
 import type { Anchor } from '../world/World';
 import { looksFor, shirtFor, sourceLabel, STATUS_COLORS, STATUS_LABEL, teamAccent } from '../world/palette';
 import { icon } from './icons';
+import { Chat } from './chat';
 import { REPO_URL } from '../config';
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, html?: string) {
+export function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, html?: string) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
   if (html !== undefined) e.innerHTML = html;
   return e;
 }
 
-function esc(s: string) {
+export function esc(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
 
@@ -47,6 +48,18 @@ export interface HudActions {
   frameAll(): void;
   toggleTheme(): void;
   startDemo(): void;
+  submitChat(prompt: string, onDelta: (chunk: string) => void): Promise<void>;
+}
+
+/** Statuses that mean "this agent is on the clock right now". */
+const BUSY = new Set(['thinking', 'working', 'waiting', 'error']);
+const BUSY_RANK: Record<string, number> = { waiting: 0, error: 0, working: 1, thinking: 2 };
+
+/** Short label for a desk. Subagents show their type; the lead shows its project. */
+function roleOf(a: Agent) {
+  return (a.role || '').toLowerCase() === (a.name || '').toLowerCase()
+    ? (a.parent ? a.role : '')
+    : a.role || (a.parent ? 'Agent' : '');
 }
 
 const SETUP: Record<string, { title: string; steps: { label: string; code: string }[]; note: string }> = {
@@ -96,10 +109,16 @@ export class Hud {
   private modePill = el('div', 'mode');
   private demoNote = el('div', 'demo-note glass');
   private teamsDock = el('nav', 'teams glass');
+  private busyPanel = el('section', 'busy glass');
+  private busyBadge = el('span', 'busy-badge');
+  private busyOpen = false;
+  private busyKey = '';
+  private chat: Chat;
   private card = el('aside', 'card glass');
   private sheet = el('div', 'sheet-wrap');
   private empty = el('div', 'empty glass');
   private themeBtn: HTMLButtonElement;
+  private busyBtn: HTMLButtonElement;
   private teamsKey = '';
   private cardKey = '';
   private state: WorldState | null = null;
@@ -108,6 +127,7 @@ export class Hud {
   private mode: ConnectionMode = 'connecting';
 
   constructor(container: HTMLElement, private actions: HudActions) {
+    this.chat = new Chat(actions.submitChat);
     this.root.append(this.tagsLayer, this.bubblesLayer);
 
     // Top bar
@@ -126,6 +146,10 @@ export class Hud {
       return b;
     };
     btn('cornersOut', 'Show everyone (F)', () => actions.frameAll());
+    tools.append(this.chat.button);
+    const busyBtn = btn('users', 'Who is working (W)', () => this.toggleBusy());
+    busyBtn.append(this.busyBadge);
+    this.busyBtn = busyBtn;
     this.themeBtn = btn('moon', 'Switch theme (T)', () => actions.toggleTheme());
     btn('plug', 'Connect your agents', () => this.openSheet());
     const gh = el('a', 'icon-btn', icon('github')) as HTMLAnchorElement;
@@ -158,7 +182,7 @@ export class Hud {
 
     this.card.setAttribute('aria-live', 'polite');
     this.buildSheet();
-    this.root.append(top, this.demoNote, this.teamsDock, this.card, this.empty, hint, this.sheet);
+    this.root.append(top, this.demoNote, this.teamsDock, this.busyPanel, this.chat.rootEl, this.card, this.empty, hint, this.sheet);
     container.append(this.root);
 
     this.bindKeys();
@@ -183,6 +207,7 @@ export class Hud {
     this.state = state;
     this.selected = selected;
     this.renderTeams();
+    this.renderBusy();
     this.renderCard();
     this.updateEmpty();
   }
@@ -219,6 +244,78 @@ export class Hud {
       b.addEventListener('click', () => this.actions.focusTeam(t.id));
       this.teamsDock.append(b);
     }
+  }
+
+  // ---------------------------------------------------------------- who is working
+
+  private busyList(): Agent[] {
+    const s = this.state!;
+    return Object.values(s.agents)
+      .filter((a) => BUSY.has(a.status))
+      .sort(
+        (a, b) =>
+          (BUSY_RANK[a.status] ?? 9) - (BUSY_RANK[b.status] ?? 9) ||
+          (s.teams[a.team]?.order ?? 0) - (s.teams[b.team]?.order ?? 0) ||
+          b.lastSeen - a.lastSeen,
+      )
+      .slice(0, 40);
+  }
+
+  private toggleBusy() {
+    this.busyOpen = !this.busyOpen;
+    this.busyKey = '';
+    if (this.busyOpen) this.renderBusy();
+    this.busyPanel.classList.toggle('show', this.busyOpen);
+    this.busyBtn.classList.toggle('active', this.busyOpen);
+  }
+
+  private closeBusy() {
+    if (!this.busyOpen) return;
+    this.busyOpen = false;
+    this.busyKey = '';
+    this.busyPanel.classList.remove('show');
+    this.busyBtn.classList.remove('active');
+  }
+
+  private renderBusy() {
+    const s = this.state;
+    const busy = s ? this.busyList() : [];
+    const n = busy.length;
+    this.busyBadge.hidden = n === 0;
+    this.busyBadge.textContent = String(n);
+    if (!this.busyOpen || !s) return;
+    const key = busy.map((a) => `${a.id}:${a.status}:${a.activity}:${a.lastSeen}`).join('|') + '|' + this.selected;
+    if (key === this.busyKey) return;
+    this.busyKey = key;
+    this.busyPanel.innerHTML = `
+      <div class="busy-head">
+        <h2>Working now</h2>
+        <button type="button" class="icon-btn close" aria-label="Close">${icon('x')}</button>
+      </div>
+      ${
+        n
+          ? `<ul class="busy-list">${busy
+              .map(
+                (agent) =>
+                  `<li><button type="button" class="busy-row${agent.id === this.selected ? ' selected' : ''}" data-id="${esc(agent.id)}">
+                    <span class="dot" style="background:${STATUS_COLORS[agent.status]}"></span>
+                    <span class="busy-who"><b>${esc(agent.name)}</b><span class="busy-meta">${esc(roleOf(agent))}${
+                      agent.activity ? ` · ${esc(agent.activity)}` : ''
+                    }</span></span>
+                    <span class="busy-when">${ago(agent.lastSeen)}</span>
+                  </button></li>`,
+              )
+              .join('')}</ul>`
+          : `<p class="busy-none">Nobody is on the clock. Agents appear here the moment they start.</p>`
+      }`;
+    this.busyPanel.querySelector('.close')!.addEventListener('click', () => this.closeBusy());
+    this.busyPanel.querySelectorAll<HTMLButtonElement>('.busy-row').forEach((b) => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.actions.select(b.dataset.id!);
+        this.closeBusy();
+      });
+    });
   }
 
   // ---------------------------------------------------------------- agent card
@@ -458,12 +555,16 @@ export class Hud {
 
   private bindKeys() {
     addEventListener('keydown', (e) => {
-      if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'Escape') {
         if (this.sheet.classList.contains('show')) this.closeSheet();
+        else if (this.busyOpen) this.closeBusy();
+        else if (this.chat.isOpen) this.chat.toggle(false);
         else this.actions.select(null);
       } else if (e.key === 'f' || e.key === 'F') this.actions.frameAll();
       else if (e.key === 't' || e.key === 'T') this.actions.toggleTheme();
+      else if (e.key === 'w' || e.key === 'W') this.toggleBusy();
+      else if (e.key === 'c' || e.key === 'C') this.chat.toggle();
       else if (e.key === ']' || e.key === '[') {
         const ids = Object.values(this.state?.agents || {})
           .sort((a, b) => (this.state!.teams[a.team]?.order ?? 0) - (this.state!.teams[b.team]?.order ?? 0) || a.joinedAt - b.joinedAt)
