@@ -31,6 +31,11 @@ const systemDark = matchMedia('(prefers-color-scheme: dark)');
 let theme: ThemeName = savedTheme() || (systemDark.matches ? 'dark' : 'light');
 
 async function boot() {
+  if (new URLSearchParams(location.search).has('studio')) {
+    const { bootStudio } = await import('./studio/boot');
+    await bootStudio(app, stage);
+    return;
+  }
   // Canvas textures draw text, so the fonts must be ready first.
   await Promise.race([
     Promise.all([document.fonts.load('600 24px "Geist Variable"'), document.fonts.load('500 20px "Geist Mono Variable"')]),

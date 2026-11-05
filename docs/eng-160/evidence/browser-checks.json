@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "viewport": "390x844",
+  "mobileEmulation": true,
+  "coordinateClicks": [
+    "Engineer menu",
+    "claim_request",
+    "report file",
+    "approve",
+    "return",
+    "blocked reason"
+  ],
+  "externalOrigins": [
+    "http://127.0.0.1:5175"
+  ],
+  "screenshots": [
+    "default.png",
+    "waiting.png",
+    "report.png",
+    "offline.png"
+  ]
+}

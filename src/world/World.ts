@@ -101,6 +101,7 @@ export class World {
   }
   private book = new SeatBook();
   private state: WorldState | null = null;
+  private studioReport: 'ready' | 'rejected' | null = null;
   private theme: ThemeName = 'light';
   private reduced = prefersReducedMotion();
   private raycaster = new Raycaster();
@@ -311,6 +312,7 @@ export class World {
         s.character.setSeat(seat);
       }
       s.character.setStatus(agent.status);
+      if (agent.id === 'engineer') s.desk.setReport(this.studioReport);
       if (agent.status === 'offline' && !s.leaving) this.depart(agent.id);
     }
 
@@ -398,6 +400,62 @@ export class World {
       to.character.lookAtWorld(from.character.headWorld(), 1.8);
       this.courier.ripple(to.character.root.getWorldPosition(new Vector3()), color);
     });
+  }
+
+  // ---------------------------------------------------------------- ENG-160 dry-run studio
+
+  setStudioReport(status: 'ready' | 'rejected' | null) {
+    this.studioReport = status;
+    this.agents.get('engineer')?.desk.setReport(status);
+  }
+
+  walkEngineerToCoo() {
+    const engineer = this.agents.get('engineer');
+    const room = engineer ? this.layout.get(engineer.team) : null;
+    const from = room?.seats.get('engineer');
+    const to = room?.seats.get('coo');
+    if (!room || !from || !to) return;
+    const aisle = room.d / 2 - 1.15;
+    engineer!.character.visit([
+      [from.x, aisle],
+      [to.x, aisle],
+      [to.x, to.z + 0.9],
+      [to.x, aisle],
+      [from.x, aisle],
+    ]);
+  }
+
+  focusStudio() {
+    const room = this.rooms.get('msos');
+    const coo = this.agents.get('coo');
+    const engineer = this.agents.get('engineer');
+    if (!room || !coo || !engineer) return;
+    this.autoFrame = false;
+    const { w, d } = room.size;
+    const target = coo.character.root.getWorldPosition(new Vector3())
+      .add(engineer.character.root.getWorldPosition(new Vector3())).multiplyScalar(0.5);
+    target.y = 0.6;
+    const dir = new Vector3(0.3, 1.1, 1).normalize();
+    // Centre the seats rather than the asymmetric room so both HTML name tags
+    // stay inside a phone viewport. Ignore fitDistance's own target adjustment.
+    const dist = this.fitDistance([{ x: room.center.x, z: room.center.z, w, d }], target.clone(), dir, 0.82);
+    this.flyTo(target, target.clone().add(dir.multiplyScalar(dist)), null);
+  }
+
+  deskAnchor(id: string): Anchor | null {
+    const seated = this.agents.get(id);
+    if (!seated) return null;
+    const v = seated.desk.root.getWorldPosition(new Vector3());
+    v.y += 1.25;
+    const depth = v.distanceTo(this.camera.position);
+    v.project(this.camera);
+    return {
+      id,
+      x: (v.x * 0.5 + 0.5) * this.container.clientWidth,
+      y: (-v.y * 0.5 + 0.5) * this.container.clientHeight,
+      depth,
+      visible: v.z < 1 && seated.character.root.visible && !seated.leaving,
+    };
   }
 
   // ---------------------------------------------------------------- selection & camera
