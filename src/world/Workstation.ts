@@ -1,4 +1,4 @@
-import { AdditiveBlending, Group, Mesh, MeshBasicMaterial, PlaneGeometry } from 'three';
+import { AdditiveBlending, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry } from 'three';
 import type { Agent } from '../../shared/protocol';
 import { clay, G } from './materials';
 import { Kit } from './kit';
@@ -59,6 +59,8 @@ export class Workstation {
   private chair = new Group();
   private screenMat: MeshBasicMaterial;
   private target: Seat | null = null;
+  private report = new Group();
+  private reportMat = new MeshStandardMaterial({ color: '#f4e9c9', roughness: 0.85 });
 
   constructor(agent: Agent) {
     const h = hash(agent.id);
@@ -165,6 +167,15 @@ export class Workstation {
     const desk = k.build();
     this.root.add(desk);
 
+    // ENG-160: optional dry-run report on the desk. Hidden in every normal floor.
+    const paper = new Mesh(new PlaneGeometry(0.28, 0.38), this.reportMat);
+    paper.rotation.x = -Math.PI / 2;
+    paper.rotation.z = 0.12;
+    this.report.add(paper);
+    this.report.position.set(0.34, DESK_H + 0.058, -0.64);
+    this.report.visible = false;
+    this.root.add(this.report);
+
     // Live screen
     this.screenMat = new MeshBasicMaterial({ map: this.screen.texture, toneMapped: false });
     this.screenMat.color.setScalar(screenBoost);
@@ -217,10 +228,16 @@ export class Workstation {
     if (near) this.screen.update(agent, t, dark);
   }
 
+  setReport(status: 'ready' | 'rejected' | null) {
+    this.report.visible = Boolean(status);
+    this.reportMat.color.set(status === 'rejected' ? '#b94b43' : '#f4e9c9');
+  }
+
   dispose() {
     this.screen.dispose();
     screenMats.delete(this.screenMat);
     this.screenMat.dispose();
+    this.reportMat.dispose();
     this.root.removeFromParent();
   }
 }

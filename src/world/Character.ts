@@ -262,6 +262,15 @@ export class Character {
     this.speed = this.paceFor(this.path);
   }
 
+  /** Dry-run studio visit: walk to another desk and then return to this seat. */
+  visit(waypoints: [number, number][]) {
+    if (!this.seat || this.mode === 'leaving' || this.mode === 'gone') return;
+    this.mode = 'walking';
+    this.sitAmount = 0;
+    this.path = [...waypoints, [this.seat.x, this.seat.z]].map(([x, z]) => new Vector3(x, 0, z));
+    this.speed = this.paceFor(this.path);
+  }
+
   /** Long trips are walked briskly so arrivals never take more than ~9 s. */
   private paceFor(path: Vector3[]) {
     let len = 0;

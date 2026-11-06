@@ -1,0 +1,7 @@
+[模拟] bridge_status {"type":"bridge_status","mode":"dry-run","connected":true,"last_update_ts":1793900410617,"note":"模拟｜本地事件序列已连接","ts":1793900410617}
+[模拟] claim_rejected {"type":"claim_rejected","agent":"engineer","reason":"模拟｜COO 正在整理上一张工单，请稍后再领取","ts":1793900410618}
+[模拟] claim_confirmed {"type":"claim_confirmed","agent":"engineer","task_id":"SIM-001","task_title":"模拟｜制作工作室领任务与验收界面","source":"模拟 COO","ts":1793900410619}
+[模拟] blocked {"type":"blocked","agent":"engineer","task_id":"SIM-001","reason":"模拟｜等待确认报告摘要字段，未连接真实系统","ts":1793900410620}
+[模拟] report_ready {"type":"report_ready","agent":"engineer","task_id":"SIM-001","report_local":"/sim-reports/SIM-001-report.md","summary":"模拟｜已完成双角色桌面、领取确认、阻塞举手与验收交互；本文件只是本地演示。","ts":1793900410621}
+[模拟] review_result {"type":"review_result","task_id":"SIM-001","result":"returned","note":"模拟｜请补充手机端空状态说明后再验收","ts":1793900410622}
+[模拟] 顺序完成：claim_rejected → claim_confirmed → blocked → report_ready → review_result；未连接任何真实系统。
